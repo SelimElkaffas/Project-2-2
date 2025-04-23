@@ -41,7 +41,7 @@ def simulate_block(cipher: CustomCipher, block: int):
     return state
 
 
-def run():
+def test2():
     message = (
         "hello guys welcome to my youtube channel :)"
     )
@@ -65,7 +65,7 @@ def run():
     print(decrypted_message)
 
 
-def main():
+def test1():
     key = "SuperSecretKey"
     plaintext_block = 0x0123456789ABCDEF  # 64-bit test block
 
@@ -81,6 +81,6 @@ def main():
     assert decrypted == plaintext_block, "Decryption failed! Something is broken."
 
 if __name__ == "__main__":
-    # main()
+    # test1()
     
-    run()
+    test2()
