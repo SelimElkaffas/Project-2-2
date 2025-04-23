@@ -13,6 +13,10 @@ class PBox:
         for i, p in enumerate(self.permutation):
             self.inverse_permutation[p] = i
 
+        # Create the bitmask lookup table for the permutation
+        # self.bitmask_lookup = [(1 << p) for p in self.permutation]
+        # self.inverse_bitmask_lookup = [(1 << p) for p in self.inverse_permutation]
+
     def permute(self, block):
         """Apply the permutation to a block (bit-level)."""
         return self._apply_permutation(block, self.permutation)
@@ -21,10 +25,10 @@ class PBox:
         """Reverese the permutation on a block."""
         return self._apply_permutation(block, self.inverse_permutation)
         
-    def _apply_permutation(self, block: int, permutation: list) -> int:
-
+    def _apply_permutation(self, block, permutation):
+        block = int(block)  # Ensure block is an integer
         result = 0
-        for i, pos in enumerate(permutation):
-            bit = (block >> pos) & 1
+        for i, p in enumerate(permutation):
+            bit = (block >> p) & 1
             result |= (bit << i)
         return result

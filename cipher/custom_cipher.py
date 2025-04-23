@@ -36,10 +36,11 @@ class CustomCipher:
         Apply SBox to each byte of a 64-bit block.
         """
         result = 0
-        for i in range(8): # 8 bytes in a 64-bit block
-            byte = (block >> (8 * i)) & 0xFF
-            substituted_byte = self.sbox.substitute(byte)
-            result |= (substituted_byte << (8 * i))
+
+        block_bytes = [(block >> (8 * i)) & 0xFF for i in range(8)]
+        sub_bytes = [self.sbox.substitute(b) for b in block_bytes]
+        result = sum((b << (8 * i)) for i, b in enumerate(sub_bytes))
+
         return result
     
     def _reverse_substitute(self, block: int) -> int:
@@ -47,8 +48,8 @@ class CustomCipher:
         Apply inverse SBox to each byte of a 64-bit block.
         """
         result = 0
-        for i in range(8):
-            byte = (block >> (8 * i)) & 0xFF
-            reversed_byte = self.sbox.reverse_substitute(byte)
-            result |= (reversed_byte << (8 * i))
+        block_bytes = [(block >> (8 * i)) & 0xFF for i in range(8)]
+        rev_bytes = [self.sbox.reverse_substitute(b) for b in block_bytes]
+        result = sum((b << (8 * i)) for i, b in enumerate(rev_bytes))
+
         return result

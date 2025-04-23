@@ -17,7 +17,8 @@ class TestKeyScheduler(unittest.TestCase):
 
         ks = KeyScheduler(base_key="secure", num_rounds=5, round_key_size=64)
         key = ks.get_round_key(2)
-        self.assertIsInstance(key, int)
+        import numpy as np
+        self.assertTrue(isinstance(key, (int, np.integer)))
         self.assertLess(key, 2**64)
 
     def test_round_key_size(self):

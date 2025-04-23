@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 class SBox:
     def __init__(self, size=256, seed=None):
@@ -7,13 +8,27 @@ class SBox:
         if seed is not None:
             random.seed(seed)
         random.shuffle(self.sbox)
+        self.inverse_sbox = [0] * size
+        for i, val in enumerate(self.sbox):
+            self.inverse_sbox[val] = i
 
     def substitute(self, byte):
         # Substitutes a byte using the S-Box
         return self.sbox[byte]
     
     def reverse_substitute(self, byte):
+        if byte < 0 or byte >= self.size:
+            raise ValueError("Byte not found in inverse S-Box")
+
         # Reverses the substitution using the inverse S-Box
-        return self.sbox.index(byte)
+        return self.inverse_sbox[byte]
+    
+    def substitute_array(self, arr):
+        """Vectorized SBox substitution for numpy arrays"""
+        return np.take(self.sbox, arr)
+    
+    def reverse_substitute_array(self, arr):
+        """Vectorized inverse SBox substitution for numpy arrays"""
+        return np.take(self.inverse_sbox, arr)
     
     
