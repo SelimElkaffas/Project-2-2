@@ -1,0 +1,19 @@
+RSA:
+    pros:
+        - simple to understand and implement
+        - libraries for it are widely available and well-tested
+    cons:
+        - requires larfe key sizez (2048-4096 bits) for strong security
+        - slower than ECC for key generation and encryption/decryption
+        - Takes more memory and bandwidth due to larger key sizes
+        - Vulnerable to quantum attacks (Shor's algorithm)
+    
+ECC:
+    pros:
+        - provides equivalent security with much smaller keys (256 bits for ECC vs 3072 bits for RSA)
+        - faster at both key generation and encryption/decryption
+        - more efficient for bandwidth and memory - ideal for lightweight apps like ours
+    cons:
+        - more complex math and implementation (totally manageable with libraries)
+        - some older systems/libraries may not support it as fully as RSA
+        - Vulnerable to quantum attacks (Shor's algorithm)

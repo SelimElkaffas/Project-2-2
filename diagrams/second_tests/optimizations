@@ -1,0 +1,2 @@
+1. added precomputed inverse SBox
+2. tried switching to numpy arrays, since numpy works with C, but it was slower (from ~2.5s to ~2.6s)
