@@ -36,77 +36,83 @@ class ChatServer:
                 print(f"Error accepting connection: {e}")
         
         self.server_socket.close()
-    
+
+    def get_online_usernames(self):
+        return list(self.clients.values())
+
     def handle_client(self, client_socket, address):
+        print("handling client ...")
         try:
-            # Step 1: Send server's public key
             server_public_key = self.key_exchange.get_public_key()
             client_socket.send(server_public_key)
-            
-            # Step 2: Receive client's public key
+
             client_public_key = client_socket.recv(4096)
-            
-            # Step 3: Derive shared session key
             session_key = self.key_exchange.derive_session_key(client_public_key)
-            
-            # Step 4: Create cipher with session key
+
+            print(f"🔑 [SERVER] Session key for {address}:", session_key.hex())
+
             cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
-            
-            # Step 5: Receive encrypted username
+
             encrypted_username_bytes = client_socket.recv(8)
             encrypted_username = int.from_bytes(encrypted_username_bytes, 'big')
             decrypted_username_blocks = [cipher.decrypt_block(encrypted_username)]
             username = blocks_to_text(decrypted_username_blocks)
-            
-            # Store the session key
+
             self.session_manager.add_key(username, session_key)
-            
-            # Add client to the list
             self.clients[client_socket] = username
-            
-            # Broadcast that the user joined
             self.broadcast(f"{username} joined the chat!")
-            
-            # Handle messages from this client
+
             while True:
                 try:
                     encrypted_message_bytes = client_socket.recv(1024)
                     if not encrypted_message_bytes:
                         break
-                    
-                    # Decrypt message
-                    encrypted_blocks = []
-                    for i in range(0, len(encrypted_message_bytes), 8):
-                        block = int.from_bytes(encrypted_message_bytes[i:i+8], 'big')
-                        encrypted_blocks.append(block)
-                    
+
+                    encrypted_blocks = [
+                        int.from_bytes(encrypted_message_bytes[i:i+8], 'big')
+                        for i in range(0, len(encrypted_message_bytes), 8)
+                    ]
                     decrypted_blocks = [cipher.decrypt_block(block) for block in encrypted_blocks]
-                    full_message = blocks_to_text(decrypted_blocks)
-                    
-                    # Split message ID and content
-                    try:
-                        message_id, message = full_message.split('|', 1)
-                        # Broadcast the message with the ID
-                        self.broadcast(f"{username}: {message}", message_id)
-                    except ValueError:
-                        # If message doesn't contain ID, broadcast as is
+                    full_message = blocks_to_text(decrypted_blocks).strip()
+
+                    print(f"[Decrypted] {full_message}")
+
+                    if full_message == "__get_users__":
+                        online_users = ",".join(self.get_online_usernames())
+                        self.send_direct(f"__users__|{online_users}", client_socket, cipher)
+                        continue
+
+                    if "|" in full_message:
+                        message_id, message = full_message.split("|", 1)
+
+                        if message.strip() == "__get_users__":
+                            online_users = ",".join(self.get_online_usernames())
+                            self.send_direct(f"__users__|{online_users}", client_socket, cipher)
+                            continue
+
+                        if "|" in message:
+                            recipient, real_msg = message.split("|", 1)
+                            self.send_to_user(recipient.strip(), f"{message_id}|{real_msg}")
+                        else:
+                            self.broadcast(f"{message_id}|{username}: {message}")
+                    else:
                         self.broadcast(f"{username}: {full_message}")
-                    
+
                 except Exception as e:
                     print(f"Error handling message from {username}: {e}")
                     break
-                    
+
         except Exception as e:
             print(f"Error handling client {address}: {e}")
         finally:
-            # Clean up
             if client_socket in self.clients:
                 username = self.clients[client_socket]
                 del self.clients[client_socket]
                 self.session_manager.remove_key(username)
                 self.broadcast(f"{username} left the chat!")
             client_socket.close()
-    
+
+
     def broadcast(self, message, message_id=None):
         """Broadcast a message to all connected clients."""
         print(f"Broadcasting: {message}")
@@ -139,6 +145,32 @@ class ChatServer:
                 if client_socket in self.clients:
                     del self.clients[client_socket]
                     client_socket.close()
+
+    def send_to_user(self, target_username, message):
+        for client_socket, username in self.clients.items():
+            if username == target_username:
+                print(f"Sending to {target_username}: {message}")  # ✅ Debug
+                session_key = self.session_manager.get_key(username)
+                cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
+                blocks = text_to_blocks(message)
+                encrypted = [cipher.encrypt_block(b) for b in blocks]
+                message_bytes = b''.join(b.to_bytes(8, 'big') for b in encrypted)
+                client_socket.send(message_bytes)
+                break
+
+
+    def send_direct(self, message, client_socket, cipher):
+        try:
+            message_blocks = text_to_blocks(message)
+            encrypted_blocks = [cipher.encrypt_block(b) for b in message_blocks]
+            message_bytes = b''.join(b.to_bytes(8, 'big') for b in encrypted_blocks)
+            client_socket.send(message_bytes)
+        except Exception as e:
+            print(f"Error sending direct message: {e}")
+            client_socket.close()
+            if client_socket in self.clients:
+                del self.clients[client_socket]
+
 
 if __name__ == "__main__":
     server = ChatServer()
