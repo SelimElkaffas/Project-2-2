@@ -10,9 +10,9 @@ class SessionKey:
     def is_expired(self):
         return datetime.now() > self.expires_at
     
-    def get_key(self):
-        if self.is_expired():
-            raise ValueError("Session key has expired")
+    def get_key(self, allow_expired=False):
+        if not allow_expired and self.is_expired():
+            raise ValueError("Session key has expired.")
         return self.key_bytes
     
     def to_dict(self):

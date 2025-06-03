@@ -4,6 +4,7 @@ from key_exchange.key_exchange_protocol import KeyExchangeProtocol
 from cipher.custom_cipher import CustomCipher
 from utils.block_conversion import text_to_blocks, blocks_to_text
 from session.session_key_manager import SessionKeyManager
+from utils.hmac_utils import compute_hmac
 
 class ChatServer:
     def __init__(self, host='127.0.0.1', port=5555):
@@ -42,15 +43,21 @@ class ChatServer:
 
     def handle_client(self, client_socket, address):
         print("handling client ...")
+        cipher = None
+        username = None
+        is_rekeying = False
+        new_key_exchange = None
+        
         try:
+            # --- Initial key exchange ---
             server_public_key = self.key_exchange.get_public_key()
             client_socket.send(server_public_key)
 
-            client_public_key = client_socket.recv(4096)
+            data = client_socket.recv(4096)
+
+            # Normal initial key exchange path
+            client_public_key = data
             session_key = self.key_exchange.derive_session_key(client_public_key)
-
-            print(f"🔑 [SERVER] Session key for {address}:", session_key.hex())
-
             cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
 
             encrypted_username_bytes = client_socket.recv(8)
@@ -60,13 +67,58 @@ class ChatServer:
 
             self.session_manager.add_key(username, session_key)
             self.clients[client_socket] = username
+
+            print(f"[SERVER] Session key for {address}: {session_key.hex()}")
             self.broadcast(f"{username} joined the chat!")
 
+            # Message handling loop
             while True:
                 try:
                     encrypted_message_bytes = client_socket.recv(1024)
                     if not encrypted_message_bytes:
                         break
+
+                    # Handle rekey response
+                    if encrypted_message_bytes.startswith(b"REKEY_RESPONSE"):
+                        print("🔄 Processing rekey response...")
+                        client_public_key = encrypted_message_bytes[len("REKEY_RESPONSE"):]
+                        
+                        # Create NEW key exchange protocol for rekey
+                        new_key_exchange = KeyExchangeProtocol()
+                        
+                        # Send our new public key to client with special prefix
+                        new_server_public_key = new_key_exchange.get_public_key()
+                        client_socket.send(b"REKEY_SERVER_KEY" + new_server_public_key)
+                        print("📤 Sent new server public key to client")
+                        
+                        # Derive new session key using the NEW key exchange
+                        session_key = new_key_exchange.derive_session_key(client_public_key)
+                        cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
+
+                        # Receive re-encrypted username
+                        encrypted_username_bytes = client_socket.recv(8)
+                        encrypted_username = int.from_bytes(encrypted_username_bytes, 'big')
+                        decrypted_username_blocks = [cipher.decrypt_block(encrypted_username)]
+                        username = blocks_to_text(decrypted_username_blocks)
+
+                        # Update session key manager with new key
+                        self.session_manager.force_add_key(username, session_key)
+                        print(f"🔐 Rekeyed user: {username} with new session key: {session_key.hex()}")
+                        
+                        continue
+
+                    # Normal message processing - ensure we have a valid cipher
+                    try:
+                        current_session_key = self.session_manager.get_key(username)
+                        # Update cipher if session key was renewed
+                        if current_session_key != session_key:
+                            cipher = CustomCipher(key=current_session_key.hex()[:16], num_rounds=8)
+                            session_key = current_session_key
+                    except ValueError:
+                        # Key expired, trigger rekey
+                        print(f"🔄 Session key expired for {username}, triggering rekey...")
+                        self.trigger_rekey(client_socket)
+                        continue
 
                     encrypted_blocks = [
                         int.from_bytes(encrypted_message_bytes[i:i+8], 'big')
@@ -77,6 +129,7 @@ class ChatServer:
 
                     print(f"[Decrypted] {full_message}")
 
+                    # Handle messages as before...
                     if full_message == "__get_users__":
                         online_users = ",".join(self.get_online_usernames())
                         self.send_direct(f"__users__|{online_users}", client_socket, cipher)
@@ -112,7 +165,6 @@ class ChatServer:
                 self.broadcast(f"{username} left the chat!")
             client_socket.close()
 
-
     def broadcast(self, message, message_id=None):
         """Broadcast a message to all connected clients."""
         print(f"Broadcasting: {message}")
@@ -126,11 +178,22 @@ class ChatServer:
                 message_blocks = text_to_blocks(f"{message_id}|{message}")
             else:
                 message_blocks = text_to_blocks(message)
-        
+
+        # Clean expired session keys before broadcasting
+        print("Cleaning expired session keys before broadcasting...")
+        self.session_manager.cleanup_expired_keys()
+
         for client_socket in list(self.clients.keys()):
             try:
                 username = self.clients[client_socket]
+
+                if self.session_manager.is_key_espired(username):
+                    print(f"Session key expired for {username}, triggering rekey...")
+                    self.trigger_rekey(client_socket)
+                    continue
+
                 session_key = self.session_manager.get_key(username)
+
                 cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
                 
                 encrypted_blocks = [cipher.encrypt_block(block) for block in message_blocks]
@@ -147,10 +210,17 @@ class ChatServer:
                     client_socket.close()
 
     def send_to_user(self, target_username, message):
+        self.session_manager.cleanup_expired_keys()  # Clean expired keys before sending
         for client_socket, username in self.clients.items():
             if username == target_username:
-                print(f"Sending to {target_username}: {message}")  # ✅ Debug
-                session_key = self.session_manager.get_key(username)
+                print(f"Sending to {target_username}: {message}")  # Debug
+                
+                try:
+                    session_key = self.session_manager.get_key(username)
+                except ValueError:
+                    self.trigger_rekey(client_socket)
+                    return
+                
                 cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
                 blocks = text_to_blocks(message)
                 encrypted = [cipher.encrypt_block(b) for b in blocks]
@@ -170,6 +240,27 @@ class ChatServer:
             client_socket.close()
             if client_socket in self.clients:
                 del self.clients[client_socket]
+
+    def trigger_rekey(self, client_socket):
+        username = self.clients.get(client_socket)
+        if not username:
+            print("[SERVER] Cannot rekey — no username bound to socket")
+            return
+        try:
+            session_obj = self.session_manager.keys.get(username)
+            if not session_obj:
+                print(f"[SERVER] No session object found for {username}, cannot rekey")
+                return
+            old_key = session_obj.get_key(allow_expired=True)
+
+            challenge = b"REKEY_CHALLENGE"
+            hmac_tag = compute_hmac(old_key, challenge)
+            payload = challenge + hmac_tag
+            client_socket.send(payload)
+            print(f"[SERVER]: Triggering rekey for {username}...")
+
+        except Exception as e:
+            print(f"[SERVER] Error triggering rekey for {username}: {e}")
 
 
 if __name__ == "__main__":
