@@ -34,8 +34,7 @@ class ChatClient:
             session_key = self.key_exchange.derive_session_key(server_public_key)
             self.session_key = session_key
 
-            print("🔐 Derived session key (hex):", session_key.hex())
-            print("🔐 Cipher key used:", session_key.hex()[:16])
+            print("[CLIENT]: Derived session key (cipher key):", session_key.hex())
 
             self.cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
 
@@ -46,7 +45,7 @@ class ChatClient:
             thread = threading.Thread(target=self.receive_messages, daemon=True)
             thread.start()
 
-            print(f"Connected to {self.host}:{self.port} as {username}")
+            print(f"[CLIENT]: Connected to {self.host}:{self.port} as {username}")
             return True
         except Exception as e:
             print(f"[Connect Error] {e}")
@@ -57,7 +56,7 @@ class ChatClient:
             try:
                 data = self.socket.recv(1024)
                 if not data:
-                    print("🔴 No data received, disconnecting.")
+                    print("[CLIENT]: No data received, disconnecting.")
                     break
 
                 # Handle rekey challenge
@@ -66,13 +65,13 @@ class ChatClient:
                     challenge = data[:15]
                     tag = data[15:15 + tag_len]
                     key = self.session_key
-                    print(f"🔄 Received rekey challenge: {challenge}, tag: {tag.hex()}")
+                    print(f"[REKEY]: Received rekey challenge: {challenge}, tag: {tag.hex()}")
 
                     if verify_hmac(key, challenge, tag):
-                        print("✔️ HMAC verified successfully, triggering rekey...")
+                        print("[REKEY]: HMAC verified successfully, triggering rekey...")
                         self.handle_rekey_process()
                     else:
-                        print("❌ HMAC verification failed, cannot rekey.")
+                        print("[ERROR]: HMAC verification failed, cannot rekey.")
                     continue
 
                 # Handle rekey server public key
@@ -86,7 +85,7 @@ class ChatClient:
                 decrypted = [self.cipher.decrypt_block(b) for b in blocks]
                 full_message = blocks_to_text(decrypted)
 
-                print(f"🟢 Decrypted received: {full_message}")
+                print(f"[DEBUG]: Decrypted received: {full_message}")
 
                 # Handle control message for user list
                 if full_message.startswith("__users__|"):
@@ -117,11 +116,9 @@ class ChatClient:
                         self.pending_search_username = None
                     continue
 
-                print("Received from server:", full_message)
-
                 if self.on_message_received:
-                    print("✅ Calling on_message_received...")
-                    print(f"🟢 Decrypted received: {full_message}")
+                    # print("✅ Calling on_message_received...")
+                    print(f"[DEBUG]: Decrypted received: {full_message}")
                     print(" *** Successfully Received Message ***")
                     self.on_message_received(full_message)
             except Exception as e:
@@ -158,10 +155,10 @@ class ChatClient:
             data = b''.join(block.to_bytes(8, 'big') for block in encrypted_blocks)
             self.socket.send(data)
         except Exception as e:
-            print("Failed to request online users:", e)
+            print("[ERROR]: Failed to request online users:", e)
 
     def send_raw(self, raw_text):
-        print("-> Sending raw text: ", raw_text, "\n")
+        # print("-> Sending raw text: ", raw_text, "\n")
         try:
             if raw_text == "__get_users__":
                 # Send it as-is (no message ID, no prefix)
@@ -179,16 +176,14 @@ class ChatClient:
 
     def handle_rekey_process(self):
         """Handle the client side of the rekey process"""
-        try:
-            print("🔄 Starting client rekey process...")
-            
+        try:      
             # Create new key exchange protocol
             self.key_exchange = KeyExchangeProtocol()
             client_public_key = self.key_exchange.get_public_key()
             
             # Send rekey response with new public key
             self.socket.send(b"REKEY_RESPONSE" + client_public_key)
-            print("📤 Sent rekey response with new public key")
+            # print("📤 Sent rekey response with new public key")
             
         except Exception as e:
             print(f"[Rekey Process Error] {e}")
@@ -196,23 +191,23 @@ class ChatClient:
     def complete_rekey(self, server_public_key):
         """Complete the rekey process with server's new public key"""
         try:
-            print("🔄 Completing rekey with server's new public key...")
+            print("[REKEY]: Completing rekey with server's new public key...")
             
             # Derive new session key
             session_key = self.key_exchange.derive_session_key(server_public_key)
             self.session_key = session_key
-            print("🔐 New session key (hex):", session_key.hex())
+            # print("🔐 New session key (hex):", session_key.hex())
             
             # Update cipher with new session key
             self.cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
-            print("🔐 New cipher key used:", session_key.hex()[:16])
+            # print("🔐 New cipher key used:", session_key.hex()[:16])
             
             # Re-send encrypted username with new cipher
             username_blocks = text_to_blocks(self.username)
             encrypted_username = self.cipher.encrypt_block(username_blocks[0])
             self.socket.send(encrypted_username.to_bytes(8, 'big'))
             
-            print("✅ Rekey completed successfully on client side")
+            print("[REKEY]: Rekey completed successfully on client side")
             
         except Exception as e:
             print(f"[Complete Rekey Error] {e}")

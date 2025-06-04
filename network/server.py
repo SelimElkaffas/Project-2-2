@@ -72,7 +72,7 @@ class ChatServer:
             self.session_manager.add_key(username, session_key)
             self.clients[client_socket] = username
 
-            print(f"[SERVER] Session key for {address}: {session_key.hex()}")
+            print(f"[SERVER]: Session key for {address}: {session_key.hex()}")
             self.broadcast(f"{username} joined the chat!")
 
             # Message handling loop
@@ -84,7 +84,7 @@ class ChatServer:
 
                     # Handle rekey response
                     if encrypted_message_bytes.startswith(b"REKEY_RESPONSE"):
-                        print("🔄 Processing rekey response...")
+                        print("[REKEY]: Processing rekey response...")
                         client_public_key = encrypted_message_bytes[len("REKEY_RESPONSE"):]
                         
                         # Create NEW key exchange protocol for rekey
@@ -93,7 +93,7 @@ class ChatServer:
                         # Send our new public key to client with special prefix
                         new_server_public_key = new_key_exchange.get_public_key()
                         client_socket.send(b"REKEY_SERVER_KEY" + new_server_public_key)
-                        print("📤 Sent new server public key to client")
+                        print("[REKEY]: Sent new server public key to client")
                         
                         # Derive new session key using the NEW key exchange
                         session_key = new_key_exchange.derive_session_key(client_public_key)
@@ -107,8 +107,7 @@ class ChatServer:
 
                         # Update session key manager with new key
                         self.session_manager.force_add_key(username, session_key)
-                        print(f"🔐 Rekeyed user: {username} with new session key: {session_key.hex()}")
-                        print(f"[SERVER] Rekey complete for {username}, new session key: {session_key.hex()}")
+                        print(f"[SERVER]: Rekey complete for {username}, new session key: {session_key.hex()}")
 
                         if client_socket in self.rekey_happening:
                             self.rekey_happening.remove(client_socket)
@@ -128,7 +127,7 @@ class ChatServer:
                     decrypted_blocks = [cipher.decrypt_block(block) for block in encrypted_blocks]
                     full_message = blocks_to_text(decrypted_blocks).strip()
 
-                    print(f"[Decrypted] {full_message}")
+                    # print(f"[Decrypted] {full_message}")
 
                     # Handle messages as before...
                     if full_message == "__get_users__":
@@ -153,11 +152,11 @@ class ChatServer:
                         self.broadcast(f"{username}: {full_message}")
 
                 except Exception as e:
-                    print(f"Error handling message from {username}: {e}")
+                    print(f"[ERROR]: Error handling message from {username}: {e}")
                     break
 
         except Exception as e:
-            print(f"Error handling client {address}: {e}")
+            print(f"[ERROR]: Error handling client {address}: {e}")
         finally:
             if client_socket in self.clients:
                 username = self.clients[client_socket]
@@ -168,7 +167,7 @@ class ChatServer:
 
     def broadcast(self, message, message_id=None):
         """Broadcast a message to all connected clients."""
-        print(f"Broadcasting: {message}")
+        print(f"[BROADCAST]: {message}")
         
         # If the message is a system message (join/leave), don't add message ID
         if message.endswith(" joined the chat!") or message.endswith(" left the chat!"):
@@ -183,7 +182,7 @@ class ChatServer:
         for client_socket in list(self.clients.keys()):
 
             if client_socket in self.rekey_happening:
-                print(f"[SERVER] Rekey in progress for {username}: {self.clients[client_socket]}, skipping broadcast")
+                print(f"[SERVER]: Rekey in progress for {username}: {self.clients[client_socket]}, skipping broadcast")
                 continue
 
             try:
@@ -200,7 +199,7 @@ class ChatServer:
                 
                 client_socket.send(message_bytes)
             except Exception as e:
-                print(f"Error broadcasting to {username}: {e}")
+                print(f"[ERROR]: Error broadcasting to {username}: {e}")
                 # Remove the client if there's an error
                 if client_socket in self.clients:
                     del self.clients[client_socket]
@@ -210,7 +209,7 @@ class ChatServer:
         for client_socket, username in self.clients.items():
 
             if client_socket in self.rekey_happening:
-                print(f"[SERVER] Rekey in progress for {username}: {self.clients[client_socket]}, skipping broadcast")
+                print(f"[SERVER]: Rekey in progress for {username}: {self.clients[client_socket]}, skipping broadcast")
                 continue
 
             if username == target_username:
@@ -233,7 +232,7 @@ class ChatServer:
             message_bytes = b''.join(b.to_bytes(8, 'big') for b in encrypted_blocks)
             client_socket.send(message_bytes)
         except Exception as e:
-            print(f"Error sending direct message: {e}")
+            print(f"[ERROR]: Error sending direct message: {e}")
             client_socket.close()
             if client_socket in self.clients:
                 del self.clients[client_socket]
@@ -242,12 +241,12 @@ class ChatServer:
         self.rekey_happening.add(client_socket)
         username = self.clients.get(client_socket)
         if not username:
-            print("[SERVER] Cannot rekey — no username bound to socket")
+            print("[SERVER]: Cannot rekey — no username bound to socket")
             return
         try:
             session_obj = self.session_manager.keys.get(username)
             if not session_obj:
-                print(f"[SERVER] No session object found for {username}, cannot rekey")
+                print(f"[SERVER]: No session object found for {username}, cannot rekey")
                 return
             old_key = session_obj.get_key(allow_expired=True)
 
@@ -258,7 +257,7 @@ class ChatServer:
             print(f"[SERVER]: Triggering rekey for {username}...")
 
         except Exception as e:
-            print(f"[SERVER] Error triggering rekey for {username}: {e}")
+            print(f"[ERROR]: Error triggering rekey for {username}: {e}")
             traceback.print_exc()
 
     def start_session_watcher(self, interval=30):
@@ -266,7 +265,7 @@ class ChatServer:
             while True:
                 for username, key_obj in list(self.session_manager.keys.items()):
                     if key_obj.is_expired():
-                        print(f"[WATCHER] Session key for {username} expired. Triggering rekey.")
+                        print(f"[WATCHER]: Session key for {username} expired. Triggering rekey.")
                         for sock, name in self.clients.items():
                             if name == username:
                                 self.trigger_rekey(sock)

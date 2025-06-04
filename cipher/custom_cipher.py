@@ -5,7 +5,7 @@ from cipher.key_scheduler import KeyScheduler
 class CustomCipher:
     def __init__(self, key: str, num_rounds: int = 8):
         self.num_rounds = num_rounds
-        self.sbox = SBox(size=256, seed=42)  # Example S-Box with a fixed seed for reproducibility
+        self.sbox = SBox(size=256, seed=42)  # Example S-Box with a fixed seed (42) for reproducibility/testing
         self.pbox = PBox(block_size=64) # Example P-Box with default permutation
         self.key_scheduler = KeyScheduler(base_key=key, num_rounds=num_rounds, round_key_size=64)
 
