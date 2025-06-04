@@ -1,5 +1,7 @@
 import socket
+import time
 import threading
+import traceback
 from key_exchange.key_exchange_protocol import KeyExchangeProtocol
 from cipher.custom_cipher import CustomCipher
 from utils.block_conversion import text_to_blocks, blocks_to_text
@@ -15,11 +17,13 @@ class ChatServer:
         self.clients = {}  # client_socket -> username
         self.key_exchange = KeyExchangeProtocol()
         self.session_manager = SessionKeyManager()
+        self.rekey_happening = set()
         
     def start(self):
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(5)
         print(f"Server started on {self.host}:{self.port}")
+        self.start_session_watcher()
         
         while True:
             try:
@@ -104,21 +108,18 @@ class ChatServer:
                         # Update session key manager with new key
                         self.session_manager.force_add_key(username, session_key)
                         print(f"🔐 Rekeyed user: {username} with new session key: {session_key.hex()}")
+                        print(f"[SERVER] Rekey complete for {username}, new session key: {session_key.hex()}")
+
+                        if client_socket in self.rekey_happening:
+                            self.rekey_happening.remove(client_socket)
                         
                         continue
 
                     # Normal message processing - ensure we have a valid cipher
-                    try:
-                        current_session_key = self.session_manager.get_key(username)
-                        # Update cipher if session key was renewed
-                        if current_session_key != session_key:
-                            cipher = CustomCipher(key=current_session_key.hex()[:16], num_rounds=8)
-                            session_key = current_session_key
-                    except ValueError:
-                        # Key expired, trigger rekey
-                        print(f"🔄 Session key expired for {username}, triggering rekey...")
-                        self.trigger_rekey(client_socket)
-                        continue
+                    current_session_key = self.session_manager.get_key(username, allow_expired=True)
+                    if current_session_key != session_key:
+                        cipher = CustomCipher(key=current_session_key.hex()[:16], num_rounds=8)
+                        session_key = current_session_key
 
                     encrypted_blocks = [
                         int.from_bytes(encrypted_message_bytes[i:i+8], 'big')
@@ -179,18 +180,14 @@ class ChatServer:
             else:
                 message_blocks = text_to_blocks(message)
 
-        # Clean expired session keys before broadcasting
-        print("Cleaning expired session keys before broadcasting...")
-        self.session_manager.cleanup_expired_keys()
-
         for client_socket in list(self.clients.keys()):
+
+            if client_socket in self.rekey_happening:
+                print(f"[SERVER] Rekey in progress for {username}: {self.clients[client_socket]}, skipping broadcast")
+                continue
+
             try:
                 username = self.clients[client_socket]
-
-                if self.session_manager.is_key_espired(username):
-                    print(f"Session key expired for {username}, triggering rekey...")
-                    self.trigger_rekey(client_socket)
-                    continue
 
                 session_key = self.session_manager.get_key(username)
 
@@ -210,16 +207,16 @@ class ChatServer:
                     client_socket.close()
 
     def send_to_user(self, target_username, message):
-        self.session_manager.cleanup_expired_keys()  # Clean expired keys before sending
         for client_socket, username in self.clients.items():
+
+            if client_socket in self.rekey_happening:
+                print(f"[SERVER] Rekey in progress for {username}: {self.clients[client_socket]}, skipping broadcast")
+                continue
+
             if username == target_username:
                 print(f"Sending to {target_username}: {message}")  # Debug
                 
-                try:
-                    session_key = self.session_manager.get_key(username)
-                except ValueError:
-                    self.trigger_rekey(client_socket)
-                    return
+                session_key = self.session_manager.get_key(username, allow_expired=True)
                 
                 cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
                 blocks = text_to_blocks(message)
@@ -242,6 +239,7 @@ class ChatServer:
                 del self.clients[client_socket]
 
     def trigger_rekey(self, client_socket):
+        self.rekey_happening.add(client_socket)
         username = self.clients.get(client_socket)
         if not username:
             print("[SERVER] Cannot rekey — no username bound to socket")
@@ -261,7 +259,22 @@ class ChatServer:
 
         except Exception as e:
             print(f"[SERVER] Error triggering rekey for {username}: {e}")
+            traceback.print_exc()
 
+    def start_session_watcher(self, interval=30):
+        def watch():
+            while True:
+                for username, key_obj in list(self.session_manager.keys.items()):
+                    if key_obj.is_expired():
+                        print(f"[WATCHER] Session key for {username} expired. Triggering rekey.")
+                        for sock, name in self.clients.items():
+                            if name == username:
+                                self.trigger_rekey(sock)
+                                break
+                time.sleep(interval)
+
+        thread = threading.Thread(target=watch, daemon=True)
+        thread.start()
 
 if __name__ == "__main__":
     server = ChatServer()
