@@ -9,7 +9,7 @@ class TestKeyExchangeProtocol(unittest.TestCase):
         alice_key = alice.derive_session_key(bob.get_public_key())
         bob_key = bob.derive_session_key(alice.get_public_key())
         self.assertEqual(alice_key, bob_key)
-        self.assertEqual(len(alice_key), 8)  # 64-bit = 8 bytes
+        self.assertEqual(len(alice_key), 16)  # 🔧 First 16 bytes used by CustomCipher
 
     def test_public_key_format(self):
         protocol = KeyExchangeProtocol()
@@ -21,7 +21,7 @@ class TestKeyExchangeProtocol(unittest.TestCase):
         alice = KeyExchangeProtocol()
         bob = KeyExchangeProtocol()
         session_key = alice.derive_session_key(bob.get_public_key())
-        self.assertEqual(len(session_key), 8)
+        self.assertEqual(len(session_key), 16)  # 🔧 match cipher use
 
     def test_session_key_consistency(self):
         alice = KeyExchangeProtocol()
@@ -54,10 +54,9 @@ class TestKeyExchangeProtocol(unittest.TestCase):
     def test_shared_secret_conversion(self):
         alice = KeyExchangeProtocol()
         bob = KeyExchangeProtocol()
-        shared_secret_hex = alice.exchanger.compute_shared_secret(bob.get_public_key())
-        shared_secret_bytes = bytes.fromhex(shared_secret_hex)
-        self.assertIsInstance(shared_secret_bytes, bytes)
-        self.assertEqual(len(shared_secret_bytes), 32)  # 256 bits for SECP256R1
+        shared_secret = alice.exchanger.compute_shared_secret(bob.get_public_key())
+        self.assertIsInstance(shared_secret, bytes)
+        self.assertEqual(len(shared_secret), 32)  # ✅ 256 bits
 
 if __name__ == "__main__":
     unittest.main()
