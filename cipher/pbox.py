@@ -30,3 +30,11 @@ class PBox:
             bit = (block >> src) & 1
             result |= (bit << dest)
         return result
+
+    def get_permutation(self):
+        """Return the permutation as a list."""
+        return self.permutation
+    
+    def get_inverse_permutation(self):
+        """Return the inverse permutation as a list."""
+        return self.inverse_permutation
