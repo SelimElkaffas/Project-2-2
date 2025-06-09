@@ -1,0 +1,38 @@
+[
+  {
+    "key_size": 8,
+    "total_attempts": 80,
+    "total_time": 4.142114877700806,
+    "attempts_per_second": 19.313805232849116,
+    "estimated_total_time": 13.25476760864258,
+    "found": true,
+    "timestamp": "2025-06-09T02:20:02.733605"
+  },
+  {
+    "key_size": 16,
+    "total_attempts": 58690,
+    "total_time": 22.385251998901367,
+    "attempts_per_second": 2621.8154704213475,
+    "estimated_total_time": 24.99641974782757,
+    "found": true,
+    "timestamp": "2025-06-09T02:20:27.086272"
+  },
+  {
+    "key_size": 24,
+    "total_attempts": 1000000,
+    "total_time": 106.55800104141235,
+    "attempts_per_second": 9384.56042931364,
+    "estimated_total_time": 1787.7466,
+    "found": false,
+    "timestamp": "2025-06-09T02:22:14.218455"
+  },
+  {
+    "key_size": 32,
+    "total_attempts": 1000000,
+    "total_time": 116.95587706565857,
+    "attempts_per_second": 8550.233003157284,
+    "estimated_total_time": 502321.66707200004,
+    "found": false,
+    "timestamp": "2025-06-09T02:24:11.922021"
+  }
+]

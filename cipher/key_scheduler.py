@@ -2,7 +2,7 @@ import hashlib
 
 
 class KeyScheduler:
-    def __init__(self, base_key: str | bytes, num_rounds: int = 8, round_key_size: int = 128):
+    def __init__(self, base_key, num_rounds: int = 8, round_key_size: int = 128):
         self.num_rounds = num_rounds
         self.round_key_size = round_key_size
 

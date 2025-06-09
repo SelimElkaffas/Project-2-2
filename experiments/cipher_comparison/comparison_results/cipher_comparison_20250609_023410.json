@@ -1,0 +1,26 @@
+[
+  {
+    "custom_cipher": {
+      "key_size": 8,
+      "total_attempts": 5,
+      "total_time": 5.04558539390564,
+      "attempts_per_second": 0.9909652913692234,
+      "estimated_total_time": 258.33397216796874,
+      "found": true,
+      "target_key": "04",
+      "ciphertext": "f81ba71905ad89d4745867ce8bec5506",
+      "timestamp": "2025-06-09T02:34:06.815523"
+    },
+    "aes": {
+      "key_size": 8,
+      "total_attempts": 5,
+      "total_time": 3.4379289150238037,
+      "attempts_per_second": 1.4543639858724016,
+      "estimated_total_time": 176.02196044921874,
+      "found": true,
+      "target_key": "04",
+      "ciphertext": "e4ef2e424e824799f5cfaefd43242b29",
+      "timestamp": "2025-06-09T02:34:10.255356"
+    }
+  }
+]
