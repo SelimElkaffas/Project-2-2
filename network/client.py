@@ -8,6 +8,7 @@ from key_exchange.key_exchange_protocol import KeyExchangeProtocol
 from cipher.custom_cipher import CustomCipher
 from utils.block_conversion import text_to_blocks, blocks_to_text
 
+
 class ChatClient:
     def __init__(self, host='127.0.0.1', port=5555):
         self.pending_search_username = None
@@ -26,21 +27,25 @@ class ChatClient:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
 
+            # Exchange public keys for session key derivation
             server_public_key = self.socket.recv(4096)
             client_public_key = self.key_exchange.get_public_key()
             self.socket.send(client_public_key)
 
+            # Derive session key and initialize cipher
             session_key = self.key_exchange.derive_session_key(server_public_key)
-
             print("🔐 Derived session key (hex):", session_key.hex())
-            print("🔐 Cipher key used:", session_key.hex()[:16])
+            print("🔐 Cipher key used:", session_key[:16])
 
-            self.cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
+            self.cipher = CustomCipher(key=session_key[:16], num_rounds=8)
 
-            username_blocks = text_to_blocks(username)
+            # Pad the username to 16 bytes and encrypt
+            username_padded = username.ljust(16, ' ')  # Ensure 16-byte username
+            username_blocks = text_to_blocks(username_padded)
             encrypted_username = self.cipher.encrypt_block(username_blocks[0])
-            self.socket.send(encrypted_username.to_bytes(8, 'big'))
+            self.socket.send(encrypted_username.to_bytes(16, 'big'))  # Send 16 bytes
 
+            # Start the thread for receiving messages
             thread = threading.Thread(target=self.receive_messages, daemon=True)
             thread.start()
 
@@ -58,7 +63,8 @@ class ChatClient:
                     print("🔴 No data received, disconnecting.")
                     break
 
-                blocks = [int.from_bytes(data[i:i+8], 'big') for i in range(0, len(data), 8)]
+                # Process and decrypt received blocks properly as 16 bytes
+                blocks = [int.from_bytes(data[i:i + 16], 'big') for i in range(0, len(data), 16)]
                 decrypted = [self.cipher.decrypt_block(b) for b in blocks]
                 full_message = blocks_to_text(decrypted)
 
@@ -98,7 +104,6 @@ class ChatClient:
                 if self.on_message_received:
                     print("✅ Calling on_message_received...")
                     print(f"🟢 Decrypted received: {full_message}")
-                    print(" *** Successfully Received Message ***")
                     self.on_message_received(full_message)
             except Exception as e:
                 print(f"[Receive Error] {e}")
@@ -118,9 +123,11 @@ class ChatClient:
 
             print(f"* Sending: {full_message}")  # Debug output
 
-            blocks = text_to_blocks(full_message)
+            # Properly pad messages and handle 16-byte blocks
+            full_message_padded = full_message.ljust((len(full_message) + 15) // 16 * 16, ' ')  # Pad to multiple of 16 bytes
+            blocks = text_to_blocks(full_message_padded)
             encrypted = [self.cipher.encrypt_block(b) for b in blocks]
-            data = b''.join(b.to_bytes(8, 'big') for b in encrypted)
+            data = b''.join(b.to_bytes(16, 'big') for b in encrypted)
             self.socket.send(data)
         except Exception as e:
             print(f"[Send Error] {e}")
@@ -128,9 +135,9 @@ class ChatClient:
     def request_online_users(self):
         print("→ requesting users...")
         try:
-            blocks = text_to_blocks("__get_users__")
+            blocks = text_to_blocks("__get_users__".ljust(16, ' '))  # Pad to 16 bytes
             encrypted_blocks = [self.cipher.encrypt_block(b) for b in blocks]
-            data = b''.join(block.to_bytes(8, 'big') for block in encrypted_blocks)
+            data = b''.join(block.to_bytes(16, 'big') for block in encrypted_blocks)
             self.socket.send(data)
         except Exception as e:
             print("Failed to request online users:", e)
@@ -139,15 +146,15 @@ class ChatClient:
         print("-> Sending raw text: ", raw_text, "\n")
         try:
             if raw_text == "__get_users__":
-                # Send it as-is (no message ID, no prefix)
-                blocks = text_to_blocks(raw_text)
+                blocks = text_to_blocks(raw_text.ljust(16, ' '))  # Pad if needed
             else:
                 message_id = str(uuid.uuid4())
                 self.last_message_id = message_id
-                blocks = text_to_blocks(f"{message_id}|{raw_text}")
+                padded_message = f"{message_id}|{raw_text}".ljust(16, ' ')  # Pad to 16 bytes
+                blocks = text_to_blocks(padded_message)
 
             encrypted = [self.cipher.encrypt_block(b) for b in blocks]
-            message_bytes = b''.join(b.to_bytes(8, 'big') for b in encrypted)
+            message_bytes = b''.join(b.to_bytes(16, 'big') for b in encrypted)
             self.socket.send(message_bytes)
         except Exception as e:
             print(f"[Send Raw Error] {e}")

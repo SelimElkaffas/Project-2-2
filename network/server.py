@@ -51,9 +51,9 @@ class ChatServer:
 
             print(f"🔑 [SERVER] Session key for {address}:", session_key.hex())
 
-            cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
+            cipher = CustomCipher(key=session_key[:16], num_rounds=8)
 
-            encrypted_username_bytes = client_socket.recv(8)
+            encrypted_username_bytes = client_socket.recv(16)
             encrypted_username = int.from_bytes(encrypted_username_bytes, 'big')
             decrypted_username_blocks = [cipher.decrypt_block(encrypted_username)]
             username = blocks_to_text(decrypted_username_blocks)
@@ -69,8 +69,8 @@ class ChatServer:
                         break
 
                     encrypted_blocks = [
-                        int.from_bytes(encrypted_message_bytes[i:i+8], 'big')
-                        for i in range(0, len(encrypted_message_bytes), 8)
+                        int.from_bytes(encrypted_message_bytes[i:i+16], 'big')
+                        for i in range(0, len(encrypted_message_bytes), 16)
                     ]
                     decrypted_blocks = [cipher.decrypt_block(block) for block in encrypted_blocks]
                     full_message = blocks_to_text(decrypted_blocks).strip()
@@ -131,12 +131,12 @@ class ChatServer:
             try:
                 username = self.clients[client_socket]
                 session_key = self.session_manager.get_key(username)
-                cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
+                cipher = CustomCipher(key=session_key[:16], num_rounds=8)
                 
                 encrypted_blocks = [cipher.encrypt_block(block) for block in message_blocks]
                 message_bytes = b''
                 for block in encrypted_blocks:
-                    message_bytes += block.to_bytes(8, 'big')
+                    message_bytes += block.to_bytes(16, 'big')
                 
                 client_socket.send(message_bytes)
             except Exception as e:
@@ -151,10 +151,10 @@ class ChatServer:
             if username == target_username:
                 print(f"Sending to {target_username}: {message}")  # ✅ Debug
                 session_key = self.session_manager.get_key(username)
-                cipher = CustomCipher(key=session_key.hex()[:16], num_rounds=8)
+                cipher = CustomCipher(key=session_key[:16], num_rounds=8)
                 blocks = text_to_blocks(message)
                 encrypted = [cipher.encrypt_block(b) for b in blocks]
-                message_bytes = b''.join(b.to_bytes(8, 'big') for b in encrypted)
+                message_bytes = b''.join(b.to_bytes(16, 'big') for b in encrypted)
                 client_socket.send(message_bytes)
                 break
 
@@ -163,7 +163,7 @@ class ChatServer:
         try:
             message_blocks = text_to_blocks(message)
             encrypted_blocks = [cipher.encrypt_block(b) for b in message_blocks]
-            message_bytes = b''.join(b.to_bytes(8, 'big') for b in encrypted_blocks)
+            message_bytes = b''.join(b.to_bytes(16, 'big') for b in encrypted_blocks)
             client_socket.send(message_bytes)
         except Exception as e:
             print(f"Error sending direct message: {e}")

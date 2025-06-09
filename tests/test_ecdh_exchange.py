@@ -1,7 +1,8 @@
-from key_exchange.ecdh_exchanger import ECDHExchanger
 import unittest
+from key_exchange.ecdh_exchanger import ECDHExchanger
 
 class TestECDHExchanger(unittest.TestCase):
+
     def test_key_pair_generation(self):
         exchanger = ECDHExchanger()
         public_key = exchanger.get_public_bytes()
@@ -30,7 +31,7 @@ class TestECDHExchanger(unittest.TestCase):
         alice = ECDHExchanger()
         bob = ECDHExchanger()
         shared_secret = alice.compute_shared_secret(bob.get_public_bytes())
-        self.assertEqual(len(bytes.fromhex(shared_secret)), 32) # 256 bits
+        self.assertEqual(len(shared_secret), 32)  # ✅ raw bytes, not hex
 
     def test_public_key_format(self):
         exchanger = ECDHExchanger()

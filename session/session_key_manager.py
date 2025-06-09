@@ -14,6 +14,7 @@ class SessionKeyManager:
         session_key = SessionKey(key_bytes, username)
         self.keys[username] = session_key
         self.save_keys()
+        print(f"Adding key of size: {len(key_bytes)}, for user: {username}")
         return session_key
     
     def get_key(self, username):

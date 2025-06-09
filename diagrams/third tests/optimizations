@@ -1,0 +1,4 @@
+1. Vectorized substitution layer with NumPy
+2. Use of JIT (just-in-time) compilation with Numba - bypasses the Python interpreter to compile Python code to     machine code at runtime
+- significantly speeds up the execution of numerical computations (very useful for our PBox)
+ 

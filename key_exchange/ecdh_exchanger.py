@@ -15,4 +15,7 @@ class ECDHExchanger:
     def compute_shared_secret(self, peer_pubic_bytes):
         peer_public_key = serialization.load_pem_public_key(peer_pubic_bytes)
         shared_key = self.private_key.exchange(ec.ECDH(), peer_public_key)
-        return shared_key.hex()
+
+        print(f"Shared secret length: {len(shared_key)}, value: {shared_key}")
+
+        return shared_key

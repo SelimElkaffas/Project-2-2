@@ -210,7 +210,6 @@ class MainWindow(QMainWindow):
                 self.sidebar.update_chat_list(self.sample_chats)
                 break
 
-
     def get_current_timestamp(self):
         return datetime.now().strftime('%I:%M %p').lstrip('0')  # 2:35 PM (24-hour users: use %H:%M)
 
