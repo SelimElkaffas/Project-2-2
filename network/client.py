@@ -27,34 +27,33 @@ class ChatClient:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
 
-            # Exchange public keys for session key derivation
+            # Key exchange: send & receive public keys
             server_public_key = self.socket.recv(4096)
             client_public_key = self.key_exchange.get_public_key()
             self.socket.send(client_public_key)
 
-            # Derive session key and initialize cipher
+            # Derive session key & init cipher
             session_key = self.key_exchange.derive_session_key(server_public_key)
-            print("🔐 Derived session key (hex):", session_key.hex())
-            print("🔐 Cipher key used:", session_key[:16])
-
+            self.session_key = session_key
             self.cipher = CustomCipher(key=session_key[:16], num_rounds=8)
 
-            # Pad the username to 16 bytes and encrypt
-            username_padded = username.ljust(16, ' ')  # Ensure 16-byte username
+            # Encrypt username and send
+            username_padded = username.ljust(16, ' ')
             username_blocks = text_to_blocks(username_padded)
             encrypted_username = self.cipher.encrypt_block(username_blocks[0])
-            self.socket.send(encrypted_username.to_bytes(16, 'big'))  # Send 16 bytes
+            self.socket.send(encrypted_username.to_bytes(16, 'big'))
 
-            # Start the thread for receiving messages
+            # Start receiving thread
             thread = threading.Thread(target=self.receive_messages, daemon=True)
             thread.start()
 
-            print(f"Connected to {self.host}:{self.port} as {username}")
+            print(f"[CLIENT]: Connected to {self.host}:{self.port} as {username}")
             return True
+
         except Exception as e:
             print(f"[Connect Error] {e}")
             return False
-
+    
     def receive_messages(self):
         while True:
             try:
