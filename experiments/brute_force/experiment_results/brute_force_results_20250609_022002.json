@@ -1,0 +1,11 @@
+[
+  {
+    "key_size": 8,
+    "total_attempts": 80,
+    "total_time": 4.142114877700806,
+    "attempts_per_second": 19.313805232849116,
+    "estimated_total_time": 13.25476760864258,
+    "found": true,
+    "timestamp": "2025-06-09T02:20:02.733605"
+  }
+]
