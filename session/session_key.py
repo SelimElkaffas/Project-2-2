@@ -5,14 +5,14 @@ class SessionKey:
         self.key_bytes = key_bytes
         self.username = username
         self.created_at = created_at or datetime.now()
-        self.expires_at = expires_at or (self.created_at + timedelta(hours=1))  # Keys expire after 1 hour
+        self.expires_at = expires_at or (self.created_at + timedelta(seconds=15))  # Keys expire after 1 hour
     
     def is_expired(self):
         return datetime.now() > self.expires_at
     
-    def get_key(self):
-        if self.is_expired():
-            raise ValueError("Session key has expired")
+    def get_key(self, allow_expired=False):
+        if not allow_expired and self.is_expired():
+            raise ValueError("Session key has expired.")
         return self.key_bytes
     
     def to_dict(self):

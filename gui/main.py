@@ -6,8 +6,8 @@ from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QMainWindow, QHBoxLayout, QWidget, QDialog
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
-from chat_sidebar import ChatSidebar
-from chat_area import ChatArea
+from gui.chat_sidebar import ChatSidebar
+from gui.chat_area import ChatArea
 from network.client import ChatClient
 
 class MainWindow(QMainWindow):

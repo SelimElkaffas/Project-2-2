@@ -2,9 +2,9 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QScrollArea, QFrame)
 from PyQt6.QtCore import Qt, pyqtSignal
-from chat_header import ChatHeader
-from message_bubble import MessageBubble
-from chat_input import ChatInput
+from gui.chat_header import ChatHeader
+from gui.message_bubble import MessageBubble
+from gui.chat_input import ChatInput
 
 class ChatArea(QWidget):
     message_sent = pyqtSignal(str)
