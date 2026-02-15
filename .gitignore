@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs / logs
+*.out
+*.log
+
+# Secrets (adjust if you actually need it versioned)
+session_keys.json
+*.env
+.env
